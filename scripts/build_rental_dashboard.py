@@ -244,6 +244,8 @@ const monthFilter = document.getElementById('monthFilter');
 for (const p of data.props) propertyFilter.innerHTML += `<option value="${p}">${p}</option>`;
 for (const c of data.cleaners) cleanerFilter.innerHTML += `<option value="${c}">${c}</option>`;
 for (const m of [...new Set(data.monthly.map(x=>x.month))]) monthFilter.innerHTML += `<option value="${m}">${m}</option>`;
+const currentMonth = new Date().toISOString().slice(0,7);
+if ([...monthFilter.options].some(o => o.value === currentMonth)) monthFilter.value = currentMonth;
 
 function monthOf(d) { return d.slice(0,7); }
 function filteredBookings() {
@@ -272,20 +274,29 @@ function renderGridGantt() {
   const el = document.getElementById('ganttGrid');
   const bookings = filteredBookings();
   const props = [...new Set(bookings.map(b=>b.property))];
-  const dates = dateRange(data.minDate, data.maxDate);
-  el.style.gridTemplateColumns = `180px repeat(${dates.length}, minmax(22px, 22px))`;
+
+  const visibleMonth = monthFilter.value !== 'ALL' ? monthFilter.value : (new Date().toISOString().slice(0,7));
+  const [y, m] = visibleMonth.split('-').map(Number);
+  const monthStart = new Date(Date.UTC(y, m-1, 1));
+  const monthEnd = new Date(Date.UTC(y, m, 0));
+  const dates = dateRange(monthStart.toISOString().slice(0,10), monthEnd.toISOString().slice(0,10));
+
+  const dayWidth = 34;
+  el.style.gridTemplateColumns = `180px repeat(${dates.length}, minmax(${dayWidth}px, ${dayWidth}px))`;
+
   let html = '';
-  html += `<div class="gantt-month header-label">Property</div>`;
+  html += `<div class="gantt-month header-label">Timeline</div>`;
   for (const d of dates) {
-    const isFirst = d.getDate() === 1;
-    const label = isFirst ? d.toLocaleString('en-US', {month:'short'}) : '';
+    const label = d.getDate() === 1 ? d.toLocaleString('en-US', {month:'short', year:'numeric'}) : '';
     html += `<div class="gantt-month">${label}</div>`;
   }
+
   html += `<div class="gantt-cell header-label">Property</div>`;
   for (const d of dates) {
     const wk = d.toLocaleString('en-US', {weekday:'short'}).slice(0,2);
     html += `<div class="gantt-cell gantt-header" title="${d.toISOString().slice(0,10)}">${wk}<br>${d.getDate()}</div>`;
   }
+
   for (const p of props) {
     html += `<div class="gantt-cell prop-label">${p}</div>`;
     const pb = bookings.filter(b => b.property===p);
