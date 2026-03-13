@@ -67,7 +67,6 @@ else:
     min_date = dt.date.today()
     max_date = dt.date.today() + dt.timedelta(days=30)
 
-total_bookings = len(bookings)
 # KPI scope: from Jan 1, 2026 through latest reservation end date
 kpi_start = dt.date(2026, 1, 1)
 
@@ -76,11 +75,25 @@ def overlap_nights(start_a, end_a, start_b, end_b):
     end = min(end_a, end_b)
     return max(0, (end - start).days)
 
+def in_kpi_window(date_obj):
+    return kpi_start <= date_obj <= max_date
+
+kpi_bookings = [
+    b for b in bookings
+    if b["check_out_date"] > kpi_start and b["check_in_date"] <= max_date
+]
+
+total_bookings = len(kpi_bookings)
 total_nights = sum(
     overlap_nights(b["check_in_date"], b["check_out_date"], kpi_start, max_date)
-    for b in bookings
+    for b in kpi_bookings
 )
-total_cleaning_cost = sum(c["cleaning_cost_isk_int"] for c in cleaning)
+
+total_cleaning_cost = sum(
+    c["cleaning_cost_isk_int"] for c in cleaning
+    if in_kpi_window(c["date_obj"])
+)
+
 avg_stay = round(total_nights / total_bookings, 2) if total_bookings else 0
 
 bookings_js = []
