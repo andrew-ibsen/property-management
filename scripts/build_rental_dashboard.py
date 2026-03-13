@@ -284,7 +284,8 @@ function renderGridGantt() {
   const visibleMonth = monthFilter.value !== 'ALL' ? monthFilter.value : (new Date().toISOString().slice(0,7));
   const [y, m] = visibleMonth.split('-').map(Number);
   const monthStart = new Date(Date.UTC(y, m-1, 1));
-  const monthEnd = new Date(Date.UTC(y, m, 0));
+  const monthsForward = 6; // show selected month + next 5 months, scroll horizontally
+  const monthEnd = new Date(Date.UTC(y, m - 1 + monthsForward, 0));
   const dates = dateRange(monthStart.toISOString().slice(0,10), monthEnd.toISOString().slice(0,10));
 
   const dayWidth = 34;
