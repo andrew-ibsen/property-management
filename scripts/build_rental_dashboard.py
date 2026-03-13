@@ -125,6 +125,10 @@ total_cleaning_cost = sum(
     if in_kpi_window(c["date_obj"])
 )
 
+kpi_days = max(1, (max_date - kpi_start).days)
+capacity_nights = max(1, kpi_days * max(1, len(properties)))
+total_occupancy_rate = round((total_nights / capacity_nights) * 100, 1)
+
 avg_stay = round(total_nights / total_bookings, 2) if total_bookings else 0
 
 bookings_js = []
@@ -151,6 +155,23 @@ for c in cleaning:
     })
 
 generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+def occupancy_color(rate: float) -> str:
+    if rate < 40:
+        return "#ef4444"
+    if rate < 55:
+        return "#f59e0b"
+    if rate < 65:
+        return "#facc15"
+    if rate < 75:
+        return "#86efac"
+    if rate < 85:
+        return "#22c55e"
+    if rate < 95:
+        return "#166534"
+    return "#3b82f6"
+
+occupancy_color_hex = occupancy_color(total_occupancy_rate)
 
 data_obj = {
     "bookings": bookings_js,
@@ -186,7 +207,7 @@ html_template = """<!doctype html>
     .top-banner { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; background:#10243b; border:1px solid #274262; border-radius:10px; padding:10px 12px; margin-bottom:12px; }
     .banner-left { font-weight:700; color:#f7d36b; }
     .banner-right { color:#9fb3d1; font-size:12px; }
-    .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+    .grid { display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
     .card { background: var(--panel); border:1px solid #223b5d; border-radius: 12px; padding: 12px; }
     .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
     .v { font-size: 28px; font-weight: 700; margin-top: 6px; color: var(--accent); }
@@ -242,6 +263,7 @@ html_template = """<!doctype html>
     <div class=\"card\"><div class=\"k\">Total Nights</div><div class=\"v\">__TOTAL_NIGHTS__</div></div>
     <div class=\"card\"><div class=\"k\">Avg Length of Stay</div><div class=\"v\">__AVG_STAY__</div></div>
     <div class=\"card\"><div class=\"k\">Total Cleaning Cost (ISK)</div><div class=\"v\">__TOTAL_CLEANING__</div></div>
+    <div class=\"card\"><div class=\"k\">Total Occupancy</div><div class=\"v\"><span class=\"occ-badge\" style=\"background:__TOTAL_OCC_COLOR__;\">__TOTAL_OCC__%</span></div></div>
   </div>
 
   <div class=\"panel\">
@@ -473,6 +495,8 @@ html = html.replace("__TOTAL_BOOKINGS__", str(total_bookings))
 html = html.replace("__TOTAL_NIGHTS__", str(total_nights))
 html = html.replace("__AVG_STAY__", str(avg_stay))
 html = html.replace("__TOTAL_CLEANING__", f"{total_cleaning_cost:,}")
+html = html.replace("__TOTAL_OCC__", f"{total_occupancy_rate:.1f}")
+html = html.replace("__TOTAL_OCC_COLOR__", occupancy_color_hex)
 html = html.replace("__DATA_JSON__", json.dumps(data_obj))
 
 OUT.write_text(html, encoding="utf-8")
