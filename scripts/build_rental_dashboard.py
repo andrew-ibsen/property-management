@@ -150,6 +150,7 @@ html_template = """<!doctype html>
     .prop-label { position:sticky; left:0; z-index:2; background:#13253d; color:#e9f1ff; font-weight:600; justify-content:flex-start; padding-left:10px; min-width:180px; }
     .header-label { position:sticky; left:0; z-index:5; background:#13253d; color:#f7d36b; font-weight:700; justify-content:flex-start; padding-left:10px; min-width:180px; }
     .occ { background:#33e0ff; color:#06202c; font-weight:700; }
+    .today-line { background:#ff4d4f !important; width:2px; min-width:2px; padding:0 !important; border-right:none !important; border-left:none !important; }
 
     .mobile-week { display:none; }
 
@@ -276,6 +277,13 @@ function fmtLocalISO(d){
   return `${y}-${m}-${day}`;
 }
 function inStay(day, b) { return day >= b.checkIn && day < b.checkOut; }
+function icelandTodayISO(){
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Atlantic/Reykjavik', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
+  const y = parts.find(p=>p.type==='year')?.value;
+  const m = parts.find(p=>p.type==='month')?.value;
+  const d = parts.find(p=>p.type==='day')?.value;
+  return `${y}-${m}-${d}`;
+}
 function renderGridGantt() {
   const el = document.getElementById('ganttGrid');
   const bookings = filteredBookings();
@@ -292,17 +300,22 @@ function renderGridGantt() {
   el.style.gridTemplateColumns = `180px repeat(${dates.length}, minmax(${dayWidth}px, ${dayWidth}px))`;
 
   let html = '';
+  const todayIceland = icelandTodayISO();
+
   html += `<div class="gantt-month header-label">Timeline</div>`;
   for (const d of dates) {
+    const ds = fmtLocalISO(d);
+    const isToday = ds === todayIceland;
     const label = d.getDate() === 1 ? d.toLocaleString('en-US', {month:'short', year:'numeric'}) : '';
-    html += `<div class="gantt-month">${label}</div>`;
+    html += `<div class="gantt-month ${isToday ? 'today-line' : ''}" title="${isToday ? 'Today (Iceland)' : ''}">${label}</div>`;
   }
 
   html += `<div class="gantt-cell header-label">Property</div>`;
   for (const d of dates) {
     const wk = d.toLocaleString('en-US', {weekday:'short'}).slice(0,2);
     const ds = fmtLocalISO(d);
-    html += `<div class="gantt-cell gantt-header" title="${ds}">${wk}<br>${d.getDate()}</div>`;
+    const isToday = ds === todayIceland;
+    html += `<div class="gantt-cell gantt-header ${isToday ? 'today-line' : ''}" title="${ds}${isToday ? ' • Today (Iceland)' : ''}">${wk}<br>${d.getDate()}</div>`;
   }
 
   for (const p of props) {
@@ -310,13 +323,14 @@ function renderGridGantt() {
     const pb = bookings.filter(b => b.property===p);
     for (const d of dates) {
       const ds = fmtLocalISO(d);
+      const isToday = ds === todayIceland;
       const hit = pb.find(b => inStay(ds, b));
       if (hit) {
         const shortGuest = (hit.guest || 'Guest').replace(/^Reserved\\s*-\\s*/i,'').slice(0,3).toUpperCase();
-        const title = `${hit.guest||'Guest'} | ${hit.checkIn}→${hit.checkOut} | ${hit.nights} nights | ${hit.platform} | Cleaner: ${hit.cleaner||''}`;
-        html += `<div class="gantt-cell occ" title="${title}">${shortGuest}</div>`;
+        const title = `${hit.guest||'Guest'} | ${hit.checkIn}→${hit.checkOut} | ${hit.nights} nights | ${hit.platform} | Cleaner: ${hit.cleaner||''}${isToday ? ' | Today (Iceland)' : ''}`;
+        html += `<div class="gantt-cell occ ${isToday ? 'today-line' : ''}" title="${title}">${shortGuest}</div>`;
       } else {
-        html += `<div class="gantt-cell"></div>`;
+        html += `<div class="gantt-cell ${isToday ? 'today-line' : ''}" title="${isToday ? 'Today (Iceland)' : ''}"></div>`;
       }
     }
   }
