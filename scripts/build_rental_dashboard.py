@@ -92,6 +92,8 @@ for c in cleaning:
         "status": c.get("status", ""),
     })
 
+generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
 data_obj = {
     "bookings": bookings_js,
     "cleaning": cleaning_js,
@@ -100,6 +102,7 @@ data_obj = {
     "cleaners": cleaners,
     "minDate": min_date.isoformat(),
     "maxDate": max_date.isoformat(),
+    "generatedAt": generated_at,
 }
 
 html_template = """<!doctype html>
@@ -122,6 +125,9 @@ html_template = """<!doctype html>
     .wrap { padding: 18px; max-width: 1500px; margin: 0 auto; }
     h1 { margin: 0 0 12px 0; font-size: 28px; }
     .sub { color: var(--muted); margin-bottom: 14px; }
+    .top-banner { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; background:#10243b; border:1px solid #274262; border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+    .banner-left { font-weight:700; color:#f7d36b; }
+    .banner-right { color:#9fb3d1; font-size:12px; }
     .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
     .card { background: var(--panel); border:1px solid #223b5d; border-radius: 12px; padding: 12px; }
     .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
@@ -164,6 +170,10 @@ html_template = """<!doctype html>
 <body>
 <div class=\"wrap\">
   <h1>Rental Ops Dashboard</h1>
+  <div class=\"top-banner\">
+    <div class=\"banner-left\">🇮🇸 Iceland Time: <span id=\"icelandNow\">--</span></div>
+    <div class=\"banner-right\">Last data refresh: <span id=\"refreshAge\">--</span></div>
+  </div>
   <div class=\"sub\">Interactive live view for bookings, stay length, guests, cleaning costs, and monthly property Gantt.</div>
 
   <div class=\"grid\">
@@ -306,9 +316,29 @@ function renderMobileWeek() {
   tbody.innerHTML = '';
   for (const r of rows) tbody.innerHTML += `<tr><td>${r.date}</td><td>${r.property}</td><td>${r.cleaner}</td><td>${r.guest||''}</td><td>${(r.costISK||0).toLocaleString()} ISK</td></tr>`;
 }
-function renderAll() { renderTables(); renderGridGantt(); renderMobileWeek(); }
+function updateIcelandBanner(){
+  const nowEl = document.getElementById('icelandNow');
+  const ageEl = document.getElementById('refreshAge');
+  if(nowEl){
+    const now = new Date();
+    nowEl.textContent = new Intl.DateTimeFormat('en-GB', { timeZone:'Atlantic/Reykjavik', weekday:'short', year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }).format(now);
+  }
+  if(ageEl && data.generatedAt){
+    const gen = new Date(data.generatedAt);
+    const sec = Math.max(0, Math.floor((Date.now() - gen.getTime())/1000));
+    const d = Math.floor(sec/86400);
+    const h = Math.floor((sec%86400)/3600);
+    const m = Math.floor((sec%3600)/60);
+    if(d>0) ageEl.textContent = `${d}d ${h}h ${m}m ago`;
+    else if(h>0) ageEl.textContent = `${h}h ${m}m ago`;
+    else ageEl.textContent = `${m}m ago`;
+  }
+}
+
+function renderAll() { renderTables(); renderGridGantt(); renderMobileWeek(); updateIcelandBanner(); }
 [propertyFilter, cleanerFilter, monthFilter].forEach(el => el.addEventListener('change', renderAll));
 renderAll();
+setInterval(updateIcelandBanner, 1000);
 </script>
 </body>
 </html>
