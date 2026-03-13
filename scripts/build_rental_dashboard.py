@@ -29,7 +29,10 @@ for r in cleaning:
     r["date_obj"] = parse_date(r["date"])
     r["cleaning_cost_isk_int"] = int(r.get("cleaning_cost_isk", 0) or 0)
 
-properties = sorted({r["property"] for r in bookings})
+# Preferred visual row order
+preferred_order = ["HFJ Uppi", "HFJ Nidurri", "RVK"]
+found_props = sorted({r["property"] for r in bookings})
+properties = [p for p in preferred_order if p in found_props] + [p for p in found_props if p not in preferred_order]
 cleaners = sorted({r["cleaner"] for r in cleaning})
 
 monthly = {}
@@ -287,7 +290,9 @@ function icelandTodayISO(){
 function renderGridGantt() {
   const el = document.getElementById('ganttGrid');
   const bookings = filteredBookings();
-  const props = [...new Set(bookings.map(b=>b.property))];
+  const preferredProps = ['HFJ Uppi','HFJ Nidurri','RVK'];
+  const present = [...new Set(bookings.map(b=>b.property))];
+  const props = preferredProps.filter(p=>present.includes(p)).concat(present.filter(p=>!preferredProps.includes(p)));
 
   const visibleMonth = monthFilter.value !== 'ALL' ? monthFilter.value : (new Date().toISOString().slice(0,7));
   const [y, m] = visibleMonth.split('-').map(Number);
