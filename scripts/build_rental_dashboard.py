@@ -20,6 +20,8 @@ def parse_date(s):
 bookings = read_csv(OPS / "bookings_merged.csv")
 cleaning = read_csv(OPS / "cleaning_schedule.csv")
 
+CUTOFF_DATE = dt.date(2026, 1, 1)
+
 for r in bookings:
     r["check_in_date"] = parse_date(r["check_in"])
     r["check_out_date"] = parse_date(r["check_out"])
@@ -29,6 +31,10 @@ for r in cleaning:
     r["date_obj"] = parse_date(r["date"])
     r["cleaning_cost_isk_int"] = int(r.get("cleaning_cost_isk", 0) or 0)
 
+# Hard business cutoff: ignore anything before 2026-01-01
+bookings = [b for b in bookings if b["check_out_date"] > CUTOFF_DATE]
+cleaning = [c for c in cleaning if c["date_obj"] >= CUTOFF_DATE]
+
 # Preferred visual row order
 preferred_order = ["HFJ Uppi", "HFJ Nidurri", "RVK"]
 found_props = sorted({r["property"] for r in bookings})
@@ -37,10 +43,14 @@ cleaners = sorted({r["cleaner"] for r in cleaning})
 
 monthly = {}
 for b in bookings:
-    m = b["check_in_date"].strftime("%Y-%m")
+    effective_start = max(b["check_in_date"], CUTOFF_DATE)
+    effective_nights = max(0, (b["check_out_date"] - effective_start).days)
+    if effective_nights <= 0:
+        continue
+    m = effective_start.strftime("%Y-%m")
     monthly.setdefault(m, {"bookings": 0, "nights": 0, "unique_guests": set(), "changeovers": 0, "cleaning_cost_isk": 0})
     monthly[m]["bookings"] += 1
-    monthly[m]["nights"] += b["nights_int"]
+    monthly[m]["nights"] += effective_nights
     monthly[m]["unique_guests"].add(b.get("summary", ""))
 
 for c in cleaning:
@@ -68,7 +78,7 @@ else:
     max_date = dt.date.today() + dt.timedelta(days=30)
 
 # KPI scope: from Jan 1, 2026 through latest reservation end date
-kpi_start = dt.date(2026, 1, 1)
+kpi_start = CUTOFF_DATE
 
 def overlap_nights(start_a, end_a, start_b, end_b):
     start = max(start_a, start_b)
