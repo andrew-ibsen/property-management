@@ -251,8 +251,8 @@ html_template = """<!doctype html>
     .gantt-cell { border-right:1px solid #1f3450; border-bottom:1px solid #1f3450; min-height:30px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#9fb3d1; }
     .gantt-header { position:sticky; top:0; z-index:3; background:#112136; }
     .gantt-month { position:sticky; top:0; z-index:4; background:#112136; color:var(--accent2); font-weight:600; border-right:1px solid #274262; border-bottom:1px solid #274262; padding:4px 6px; font-size:12px; }
-    .prop-label { position:sticky; left:0; z-index:2; background:#13253d; color:#e9f1ff; font-weight:600; justify-content:flex-start; padding-left:10px; min-width:180px; }
-    .header-label { position:sticky; left:0; z-index:5; background:#13253d; color:#f7d36b; font-weight:700; justify-content:flex-start; padding-left:10px; min-width:180px; }
+    .prop-label { position:sticky; left:0; z-index:2; background:#13253d; color:#e9f1ff; font-weight:600; justify-content:flex-start; padding-left:8px; min-width:120px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .header-label { position:sticky; left:0; z-index:5; background:#13253d; color:#f7d36b; font-weight:700; justify-content:flex-start; padding-left:8px; min-width:120px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .occ { background:#33e0ff; color:#06202c; font-weight:700; }
     .today-line { position:relative; }
     .today-line::after { content:''; position:absolute; top:0; bottom:0; left:0; width:2px; background:#ff4d4f; pointer-events:none; z-index:6; }
@@ -434,7 +434,7 @@ function renderGridGantt() {
   const dates = dateRange(monthStart.toISOString().slice(0,10), monthEnd.toISOString().slice(0,10));
 
   const dayWidth = 34;
-  el.style.gridTemplateColumns = `180px repeat(${dates.length}, minmax(${dayWidth}px, ${dayWidth}px))`;
+  el.style.gridTemplateColumns = `120px repeat(${dates.length}, minmax(${dayWidth}px, ${dayWidth}px))`;
 
   let html = '';
   const todayIceland = icelandTodayISO();
