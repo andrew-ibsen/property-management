@@ -253,7 +253,7 @@ html_template = """<!doctype html>
 <div class=\"wrap\">
   <h1>Rental Ops Dashboard</h1>
   <div class=\"top-banner\">
-    <div class=\"banner-left\">🇮🇸 (IS) Iceland Time: <span id=\"icelandNow\">--</span></div>
+    <div class=\"banner-left\">🇮🇸 Iceland Time: <span id=\"icelandNow\">--</span></div>
     <div class=\"banner-right\">Last data refresh: <span id=\"refreshAge\">--</span></div>
   </div>
   <div class=\"sub\">Interactive live view for bookings, stay length, guests, cleaning costs, and monthly property Gantt.</div>
