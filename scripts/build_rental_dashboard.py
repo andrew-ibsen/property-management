@@ -17,6 +17,12 @@ def parse_date(s):
     return dt.date.fromisoformat(s)
 
 
+def overlap_nights(start_a, end_a, start_b, end_b):
+    start = max(start_a, start_b)
+    end = min(end_a, end_b)
+    return max(0, (end - start).days)
+
+
 bookings = read_csv(OPS / "bookings_merged.csv")
 cleaning = read_csv(OPS / "cleaning_schedule.csv")
 
@@ -41,34 +47,54 @@ found_props = sorted({r["property"] for r in bookings})
 properties = [p for p in preferred_order if p in found_props] + [p for p in found_props if p not in preferred_order]
 cleaners = sorted({r["cleaner"] for r in cleaning})
 
+def is_blocked_or_empty(summary: str) -> bool:
+    s = (summary or "").strip().lower()
+    markers = ["not available", "airbnb (not available)", "blocked", "unavailable"]
+    return any(m in s for m in markers)
+
+
+def month_start(d: dt.date) -> dt.date:
+    return dt.date(d.year, d.month, 1)
+
+
+def add_month(d: dt.date) -> dt.date:
+    if d.month == 12:
+        return dt.date(d.year + 1, 1, 1)
+    return dt.date(d.year, d.month + 1, 1)
+
+
+bookings_for_metrics = [b for b in bookings if not is_blocked_or_empty(b.get("summary", ""))]
+
 monthly = {}
-for b in bookings:
-    effective_start = max(b["check_in_date"], CUTOFF_DATE)
-    effective_nights = max(0, (b["check_out_date"] - effective_start).days)
-    if effective_nights <= 0:
-        continue
-    m = effective_start.strftime("%Y-%m")
-    monthly.setdefault(m, {"bookings": 0, "nights": 0, "unique_guests": set(), "changeovers": 0, "cleaning_cost_isk": 0})
-    monthly[m]["bookings"] += 1
-    monthly[m]["nights"] += effective_nights
-    monthly[m]["unique_guests"].add(b.get("summary", ""))
+if bookings:
+    m = month_start(CUTOFF_DATE)
+    end_m = month_start(max(b["check_out_date"] for b in bookings))
+    while m <= end_m:
+        m_next = add_month(m)
+        m_key = m.strftime("%Y-%m")
 
-for c in cleaning:
-    m = c["date_obj"].strftime("%Y-%m")
-    monthly.setdefault(m, {"bookings": 0, "nights": 0, "unique_guests": set(), "changeovers": 0, "cleaning_cost_isk": 0})
-    monthly[m]["cleaning_cost_isk"] += c["cleaning_cost_isk_int"]
-    monthly[m]["changeovers"] += 1
+        nights = sum(overlap_nights(b["check_in_date"], b["check_out_date"], m, m_next) for b in bookings_for_metrics)
+        bookings_count = sum(1 for b in bookings_for_metrics if m <= b["check_in_date"] < m_next)
+        unique_guests = {b.get("summary", "") for b in bookings_for_metrics if overlap_nights(b["check_in_date"], b["check_out_date"], m, m_next) > 0 and b.get("summary", "")}
+        changeovers = sum(1 for c in cleaning if m <= c["date_obj"] < m_next)
+        cleaning_cost = sum(c["cleaning_cost_isk_int"] for c in cleaning if m <= c["date_obj"] < m_next)
 
-monthly_rows = []
-for m, v in sorted(monthly.items()):
-    monthly_rows.append({
-        "month": m,
-        "bookings": v["bookings"],
-        "nights": v["nights"],
-        "changeovers": v["changeovers"],
-        "cleaning_cost_isk": v["cleaning_cost_isk"],
-        "unique_guest_count": len([x for x in v["unique_guests"] if x]),
-    })
+        days_in_month = (m_next - m).days
+        prop_count = max(1, len(properties))
+        occupancy_rate = round((nights / (days_in_month * prop_count)) * 100, 1) if days_in_month > 0 else 0
+
+        monthly[m_key] = {
+            "month": m_key,
+            "bookings": bookings_count,
+            "nights": nights,
+            "changeovers": changeovers,
+            "cleaning_cost_isk": cleaning_cost,
+            "unique_guest_count": len(unique_guests),
+            "occupancy_rate": max(0, min(100, occupancy_rate)),
+        }
+        m = m_next
+
+monthly_rows = [monthly[k] for k in sorted(monthly.keys())]
 
 if bookings:
     min_date = min(b["check_in_date"] for b in bookings)
@@ -79,11 +105,6 @@ else:
 
 # KPI scope: from Jan 1, 2026 through latest reservation end date
 kpi_start = CUTOFF_DATE
-
-def overlap_nights(start_a, end_a, start_b, end_b):
-    start = max(start_a, start_b)
-    end = min(end_a, end_b)
-    return max(0, (end - start).days)
 
 def in_kpi_window(date_obj):
     return kpi_start <= date_obj <= max_date
@@ -178,6 +199,7 @@ html_template = """<!doctype html>
     .table-wrap { max-height: 340px; overflow:auto; }
     .footer { color:var(--muted); font-size:12px; margin-top: 8px; }
     .legend { color:var(--muted); font-size:12px; margin:8px 0; }
+    .occ-badge { display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; color:#061423; }
 
     .gantt-scroll { overflow-x:auto; border:1px solid #274262; border-radius:8px; background:#0f1d31; -webkit-overflow-scrolling: touch; }
     .gantt-grid { display:grid; min-width:1200px; }
@@ -266,7 +288,7 @@ html_template = """<!doctype html>
     <h3 style=\"margin-top:0\">Monthly Metrics</h3>
     <div class=\"table-wrap\">
       <table id=\"monthlyTable\">
-        <thead><tr><th>Month</th><th>Bookings</th><th>Nights</th><th>Changeovers</th><th>Cleaning Cost (ISK)</th><th>Unique Guests</th></tr></thead>
+        <thead><tr><th>Month</th><th>Bookings</th><th>Nights</th><th>Changeovers</th><th>Cleaning Cost (ISK)</th><th>Unique Guests</th><th>Occupancy</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -297,11 +319,25 @@ function filteredBookings() {
 function filteredMonthly() {
   return data.monthly.filter(m => (monthFilter.value==='ALL' || m.month===monthFilter.value));
 }
+function occupancyColor(rate){
+  const r = Number(rate || 0);
+  if (r < 40) return '#ef4444';
+  if (r < 55) return '#f59e0b';
+  if (r < 65) return '#facc15';
+  if (r < 75) return '#86efac';
+  if (r < 85) return '#22c55e';
+  if (r < 95) return '#166534';
+  return '#3b82f6';
+}
 function renderTables() {
   const bt = document.querySelector('#bookingsTable tbody'); bt.innerHTML='';
   for (const b of filteredBookings()) bt.innerHTML += `<tr><td>${b.property}</td><td>${b.platform}</td><td>${b.guest||''}</td><td>${b.checkIn}</td><td>${b.checkOut}</td><td>${b.nights}</td><td>${b.cleaner||''}</td></tr>`;
   const mt = document.querySelector('#monthlyTable tbody'); mt.innerHTML='';
-  for (const m of filteredMonthly()) mt.innerHTML += `<tr><td>${m.month}</td><td>${m.bookings}</td><td>${m.nights}</td><td>${m.changeovers||0}</td><td>${(m.cleaning_cost_isk||0).toLocaleString()}</td><td>${m.unique_guest_count}</td></tr>`;
+  for (const m of filteredMonthly()) {
+    const occ = Number(m.occupancy_rate || 0).toFixed(1);
+    const occColor = occupancyColor(occ);
+    mt.innerHTML += `<tr><td>${m.month}</td><td>${m.bookings}</td><td>${m.nights}</td><td>${m.changeovers||0}</td><td>${(m.cleaning_cost_isk||0).toLocaleString()}</td><td>${m.unique_guest_count}</td><td><span class="occ-badge" style="background:${occColor}">${occ}%</span></td></tr>`;
+  }
 }
 function dateRange(minStr, maxStr) {
   const out = []; const d = new Date(minStr + 'T00:00:00'); const end = new Date(maxStr + 'T00:00:00');
