@@ -153,7 +153,8 @@ html_template = """<!doctype html>
     .prop-label { position:sticky; left:0; z-index:2; background:#13253d; color:#e9f1ff; font-weight:600; justify-content:flex-start; padding-left:10px; min-width:180px; }
     .header-label { position:sticky; left:0; z-index:5; background:#13253d; color:#f7d36b; font-weight:700; justify-content:flex-start; padding-left:10px; min-width:180px; }
     .occ { background:#33e0ff; color:#06202c; font-weight:700; }
-    .today-line { background:#ff4d4f !important; width:2px; min-width:2px; padding:0 !important; border-right:none !important; border-left:none !important; }
+    .today-line { position:relative; }
+    .today-line::after { content:''; position:absolute; top:0; bottom:0; left:0; width:2px; background:#ff4d4f; pointer-events:none; z-index:6; }
 
     .mobile-week { display:none; }
 
