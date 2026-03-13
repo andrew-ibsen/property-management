@@ -60,17 +60,28 @@ for m, v in sorted(monthly.items()):
         "unique_guest_count": len([x for x in v["unique_guests"] if x]),
     })
 
-total_bookings = len(bookings)
-total_nights = sum(b["nights_int"] for b in bookings)
-total_cleaning_cost = sum(c["cleaning_cost_isk_int"] for c in cleaning)
-avg_stay = round(total_nights / total_bookings, 2) if total_bookings else 0
-
 if bookings:
     min_date = min(b["check_in_date"] for b in bookings)
     max_date = max(b["check_out_date"] for b in bookings)
 else:
     min_date = dt.date.today()
     max_date = dt.date.today() + dt.timedelta(days=30)
+
+total_bookings = len(bookings)
+# KPI scope: from Jan 1, 2026 through latest reservation end date
+kpi_start = dt.date(2026, 1, 1)
+
+def overlap_nights(start_a, end_a, start_b, end_b):
+    start = max(start_a, start_b)
+    end = min(end_a, end_b)
+    return max(0, (end - start).days)
+
+total_nights = sum(
+    overlap_nights(b["check_in_date"], b["check_out_date"], kpi_start, max_date)
+    for b in bookings
+)
+total_cleaning_cost = sum(c["cleaning_cost_isk_int"] for c in cleaning)
+avg_stay = round(total_nights / total_bookings, 2) if total_bookings else 0
 
 bookings_js = []
 for b in bookings:
