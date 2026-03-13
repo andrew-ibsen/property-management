@@ -115,22 +115,27 @@ kpi_bookings = [
     if b["check_out_date"] > kpi_start and b["check_in_date"] < kpi_end_exclusive
 ]
 
-total_bookings = len(kpi_bookings)
-total_nights = sum(
+# Guest-booked nights only (excludes blocked/unavailable holds)
+kpi_booked_guest = [b for b in kpi_bookings if not is_blocked_or_empty(b.get("summary", ""))]
+
+total_bookings = len(kpi_booked_guest)
+booked_nights = sum(
     overlap_nights(b["check_in_date"], b["check_out_date"], kpi_start, kpi_end_exclusive)
-    for b in kpi_bookings
+    for b in kpi_booked_guest
 )
+
+kpi_days = max(1, (kpi_end_exclusive - kpi_start).days)
+total_nights = max(1, kpi_days * max(1, len(properties)))  # total inventory nights = available + booked
+total_available_nights = max(0, total_nights - booked_nights)
 
 total_cleaning_cost = sum(
     c["cleaning_cost_isk_int"] for c in cleaning
     if in_kpi_window(c["date_obj"])
 )
 
-kpi_days = max(1, (kpi_end_exclusive - kpi_start).days)
-capacity_nights = max(1, kpi_days * max(1, len(properties)))
-total_occupancy_rate = round((total_nights / capacity_nights) * 100, 1)
+total_occupancy_rate = round((booked_nights / total_nights) * 100, 1)
 
-avg_stay = round(total_nights / total_bookings, 2) if total_bookings else 0
+avg_stay = round(booked_nights / total_bookings, 2) if total_bookings else 0
 
 bookings_js = []
 for b in bookings:
@@ -208,7 +213,7 @@ html_template = """<!doctype html>
     .top-banner { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; background:#10243b; border:1px solid #274262; border-radius:10px; padding:10px 12px; margin-bottom:12px; }
     .banner-left { font-weight:700; color:#f7d36b; }
     .banner-right { color:#9fb3d1; font-size:12px; }
-    .grid { display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
+    .grid { display:grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 14px; }
     .card { background: var(--panel); border:1px solid #223b5d; border-radius: 12px; padding: 12px; }
     .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
     .v { font-size: 28px; font-weight: 700; margin-top: 6px; color: var(--accent); }
@@ -262,6 +267,7 @@ html_template = """<!doctype html>
   <div class=\"grid\">
     <div class=\"card\"><div class=\"k\">Total Bookings</div><div class=\"v\">__TOTAL_BOOKINGS__</div></div>
     <div class=\"card\"><div class=\"k\">Total Nights</div><div class=\"v\">__TOTAL_NIGHTS__</div></div>
+    <div class=\"card\"><div class=\"k\">Available Nights</div><div class=\"v\">__TOTAL_AVAILABLE_NIGHTS__</div></div>
     <div class=\"card\"><div class=\"k\">Avg Length of Stay</div><div class=\"v\">__AVG_STAY__</div></div>
     <div class=\"card\"><div class=\"k\">Total Cleaning Cost (ISK)</div><div class=\"v\">__TOTAL_CLEANING__</div></div>
     <div class=\"card\"><div class=\"k\">Total Occupancy</div><div class=\"v\"><span class=\"occ-badge\" style=\"background:__TOTAL_OCC_COLOR__;\">__TOTAL_OCC__%</span></div></div>
@@ -493,7 +499,8 @@ setInterval(updateIcelandBanner, 1000);
 
 html = html_template
 html = html.replace("__TOTAL_BOOKINGS__", str(total_bookings))
-html = html.replace("__TOTAL_NIGHTS__", str(total_nights))
+html = html.replace("__TOTAL_NIGHTS__", f"{total_nights:,}")
+html = html.replace("__TOTAL_AVAILABLE_NIGHTS__", f"{total_available_nights:,}")
 html = html.replace("__AVG_STAY__", str(avg_stay))
 html = html.replace("__TOTAL_CLEANING__", f"{total_cleaning_cost:,}")
 html = html.replace("__TOTAL_OCC__", f"{total_occupancy_rate:.1f}")
