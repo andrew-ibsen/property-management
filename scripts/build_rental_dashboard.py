@@ -115,8 +115,9 @@ kpi_bookings = [
     if b["check_out_date"] > kpi_start and b["check_in_date"] < kpi_end_exclusive
 ]
 
-# Guest-booked nights only (excludes blocked/unavailable holds)
+# Guest bookings only (blocked/unavailable excluded)
 kpi_booked_guest = [b for b in kpi_bookings if not is_blocked_or_empty(b.get("summary", ""))]
+kpi_blocked = [b for b in kpi_bookings if is_blocked_or_empty(b.get("summary", ""))]
 
 total_bookings = len(kpi_booked_guest)
 booked_nights = sum(
@@ -124,8 +125,25 @@ booked_nights = sum(
     for b in kpi_booked_guest
 )
 
+# Inventory math by property-day to avoid double counting across feeds
 kpi_days = max(1, (kpi_end_exclusive - kpi_start).days)
-total_nights = max(1, kpi_days * max(1, len(properties)))  # total inventory nights = available + booked
+all_days = [kpi_start + dt.timedelta(days=i) for i in range(kpi_days)]
+
+booked_inventory_nights = 0
+blocked_inventory_nights = 0
+for prop in properties:
+    prop_guest = [b for b in kpi_booked_guest if b["property"] == prop]
+    prop_blocked = [b for b in kpi_blocked if b["property"] == prop]
+    for day in all_days:
+        if any(b["check_in_date"] <= day < b["check_out_date"] for b in prop_guest):
+            booked_inventory_nights += 1
+        elif any(b["check_in_date"] <= day < b["check_out_date"] for b in prop_blocked):
+            blocked_inventory_nights += 1
+
+raw_capacity_nights = max(1, kpi_days * max(1, len(properties)))
+total_nights = max(1, raw_capacity_nights - blocked_inventory_nights)  # inventory after blocked removal
+booked_nights = booked_inventory_nights  # authoritative booked inventory nights
+
 total_available_nights = max(0, total_nights - booked_nights)
 
 total_cleaning_cost = sum(
