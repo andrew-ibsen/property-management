@@ -103,20 +103,21 @@ else:
     min_date = dt.date.today()
     max_date = dt.date.today() + dt.timedelta(days=30)
 
-# KPI scope: from Jan 1, 2026 through latest reservation end date
+# KPI scope: Jan 1, 2026 through Dec 31, 2026 (calendar year only)
 kpi_start = CUTOFF_DATE
+kpi_end_exclusive = dt.date(2027, 1, 1)
 
 def in_kpi_window(date_obj):
-    return kpi_start <= date_obj <= max_date
+    return kpi_start <= date_obj < kpi_end_exclusive
 
 kpi_bookings = [
     b for b in bookings
-    if b["check_out_date"] > kpi_start and b["check_in_date"] <= max_date
+    if b["check_out_date"] > kpi_start and b["check_in_date"] < kpi_end_exclusive
 ]
 
 total_bookings = len(kpi_bookings)
 total_nights = sum(
-    overlap_nights(b["check_in_date"], b["check_out_date"], kpi_start, max_date)
+    overlap_nights(b["check_in_date"], b["check_out_date"], kpi_start, kpi_end_exclusive)
     for b in kpi_bookings
 )
 
@@ -125,7 +126,7 @@ total_cleaning_cost = sum(
     if in_kpi_window(c["date_obj"])
 )
 
-kpi_days = max(1, (max_date - kpi_start).days)
+kpi_days = max(1, (kpi_end_exclusive - kpi_start).days)
 capacity_nights = max(1, kpi_days * max(1, len(properties)))
 total_occupancy_rate = round((total_nights / capacity_nights) * 100, 1)
 
