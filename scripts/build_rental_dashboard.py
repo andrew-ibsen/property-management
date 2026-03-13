@@ -298,6 +298,20 @@ html_template = """<!doctype html>
 </div>
 
 <script>
+(function(){
+  const required = 'Brekkugata';
+  const key = 'pm_dashboard_auth';
+  const ok = sessionStorage.getItem(key) === 'ok';
+  if(!ok){
+    const entered = prompt('Protected dashboard. Enter password:');
+    if(entered !== required){
+      document.body.innerHTML = '<div style="font-family:Segoe UI,Arial,sans-serif;padding:40px;background:#0f1724;color:#e9f1ff;min-height:100vh;">Access denied.</div>';
+      throw new Error('Unauthorized');
+    }
+    sessionStorage.setItem(key,'ok');
+  }
+})();
+
 const data = __DATA_JSON__;
 const propertyFilter = document.getElementById('propertyFilter');
 const cleanerFilter = document.getElementById('cleanerFilter');
