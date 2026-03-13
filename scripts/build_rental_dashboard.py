@@ -118,7 +118,7 @@ html_template = """<!doctype html>
       --accent2: #f7d36b;
       --grid: #274262;
     }
-    body { margin:0; font-family: Inter, Segoe UI, Arial, sans-serif; background: var(--bg); color: var(--text);} 
+    body { margin:0; font-family: Inter, Segoe UI, Arial, sans-serif; background: var(--bg); color: var(--text); }
     .wrap { padding: 18px; max-width: 1500px; margin: 0 auto; }
     h1 { margin: 0 0 12px 0; font-size: 28px; }
     .sub { color: var(--muted); margin-bottom: 14px; }
@@ -133,19 +133,31 @@ html_template = """<!doctype html>
     th, td { border-bottom:1px solid #274262; padding:8px; font-size: 13px; }
     th { color: var(--accent2); text-align:left; position: sticky; top: 0; background: #16243a; }
     .table-wrap { max-height: 340px; overflow:auto; }
-    .gantt-wrap { overflow-x:auto; overflow-y:hidden; border:1px solid #274262; border-radius: 8px; background:#0f1d31; -webkit-overflow-scrolling: touch; }
-    .gantt-wrap svg { display:block; min-width: 1200px; }
-    .legend { color:var(--muted); font-size:12px; margin:8px 0; }
     .footer { color:var(--muted); font-size:12px; margin-top: 8px; }
+    .legend { color:var(--muted); font-size:12px; margin:8px 0; }
+
+    .gantt-scroll { overflow-x:auto; border:1px solid #274262; border-radius:8px; background:#0f1d31; -webkit-overflow-scrolling: touch; }
+    .gantt-grid { display:grid; min-width:1200px; }
+    .gantt-cell { border-right:1px solid #1f3450; border-bottom:1px solid #1f3450; min-height:30px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#9fb3d1; }
+    .gantt-header { position:sticky; top:0; z-index:3; background:#112136; }
+    .gantt-month { position:sticky; top:0; z-index:4; background:#112136; color:var(--accent2); font-weight:600; border-right:1px solid #274262; border-bottom:1px solid #274262; padding:4px 6px; font-size:12px; }
+    .prop-label { position:sticky; left:0; z-index:2; background:#13253d; color:#e9f1ff; font-weight:600; justify-content:flex-start; padding-left:10px; min-width:180px; }
+    .header-label { position:sticky; left:0; z-index:5; background:#13253d; color:#f7d36b; font-weight:700; justify-content:flex-start; padding-left:10px; min-width:180px; }
+    .occ { background:#33e0ff; color:#06202c; font-weight:700; }
+
+    .mobile-week { display:none; }
+
     @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2,1fr); } }
     @media (max-width: 700px) {
-      .wrap { padding: 12px; }
+      .wrap { padding:12px; }
       .grid { grid-template-columns: 1fr; }
-      h1 { font-size: 22px; }
-      .v { font-size: 24px; }
-      .filters { flex-direction: column; align-items: stretch; }
-      .filters label { display: flex; flex-direction: column; gap: 6px; }
-      th, td { font-size: 12px; padding: 6px; }
+      h1 { font-size:22px; }
+      .v { font-size:24px; }
+      .filters { flex-direction:column; align-items:stretch; }
+      .filters label { display:flex; flex-direction:column; gap:6px; }
+      th, td { font-size:12px; padding:6px; }
+      .desktop-gantt { display:none; }
+      .mobile-week { display:block; }
     }
   </style>
 </head>
@@ -175,10 +187,20 @@ html_template = """<!doctype html>
     </div>
   </div>
 
-  <div class=\"panel\">
+  <div class=\"panel desktop-gantt\">
     <h3 style=\"margin-top:0\">Monthly Linear Gantt (Properties vs Timeline)</h3>
-    <div class=\"legend\">Bars = occupied stay windows. Timeline shown by day with monthly headers.</div>
-    <div class=\"gantt-wrap\"><svg id=\"gantt\" width=\"1400\" height=\"420\"></svg></div>
+    <div class=\"legend\">1 block = 1 day. Includes month, weekday, and day number headers.</div>
+    <div class=\"gantt-scroll\"><div id=\"ganttGrid\" class=\"gantt-grid\"></div></div>
+  </div>
+
+  <div class=\"panel mobile-week\">
+    <h3 style=\"margin-top:0\">Cleaner Week View (Mobile)</h3>
+    <div class=\"table-wrap\">
+      <table id=\"mobileWeekTable\">
+        <thead><tr><th>Date</th><th>Property</th><th>Cleaner</th><th>Guest</th><th>Cost</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <div class=\"panel\">
@@ -206,17 +228,14 @@ html_template = """<!doctype html>
 
 <script>
 const data = __DATA_JSON__;
-
 const propertyFilter = document.getElementById('propertyFilter');
 const cleanerFilter = document.getElementById('cleanerFilter');
 const monthFilter = document.getElementById('monthFilter');
-
 for (const p of data.props) propertyFilter.innerHTML += `<option value="${p}">${p}</option>`;
 for (const c of data.cleaners) cleanerFilter.innerHTML += `<option value="${c}">${c}</option>`;
 for (const m of [...new Set(data.monthly.map(x=>x.month))]) monthFilter.innerHTML += `<option value="${m}">${m}</option>`;
 
 function monthOf(d) { return d.slice(0,7); }
-
 function filteredBookings() {
   return data.bookings.filter(b =>
     (propertyFilter.value==='ALL' || b.property===propertyFilter.value) &&
@@ -224,89 +243,70 @@ function filteredBookings() {
     (monthFilter.value==='ALL' || monthOf(b.checkIn)===monthFilter.value || monthOf(b.checkOut)===monthFilter.value)
   );
 }
-
 function filteredMonthly() {
   return data.monthly.filter(m => (monthFilter.value==='ALL' || m.month===monthFilter.value));
 }
-
 function renderTables() {
-  const bt = document.querySelector('#bookingsTable tbody');
-  bt.innerHTML='';
-  for (const b of filteredBookings()) {
-    bt.innerHTML += `<tr><td>${b.property}</td><td>${b.platform}</td><td>${b.guest||''}</td><td>${b.checkIn}</td><td>${b.checkOut}</td><td>${b.nights}</td><td>${b.cleaner||''}</td></tr>`;
-  }
-
-  const mt = document.querySelector('#monthlyTable tbody');
-  mt.innerHTML='';
-  for (const m of filteredMonthly()) {
-    mt.innerHTML += `<tr><td>${m.month}</td><td>${m.bookings}</td><td>${m.nights}</td><td>${m.changeovers||0}</td><td>${(m.cleaning_cost_isk||0).toLocaleString()}</td><td>${m.unique_guest_count}</td></tr>`;
-  }
+  const bt = document.querySelector('#bookingsTable tbody'); bt.innerHTML='';
+  for (const b of filteredBookings()) bt.innerHTML += `<tr><td>${b.property}</td><td>${b.platform}</td><td>${b.guest||''}</td><td>${b.checkIn}</td><td>${b.checkOut}</td><td>${b.nights}</td><td>${b.cleaner||''}</td></tr>`;
+  const mt = document.querySelector('#monthlyTable tbody'); mt.innerHTML='';
+  for (const m of filteredMonthly()) mt.innerHTML += `<tr><td>${m.month}</td><td>${m.bookings}</td><td>${m.nights}</td><td>${m.changeovers||0}</td><td>${(m.cleaning_cost_isk||0).toLocaleString()}</td><td>${m.unique_guest_count}</td></tr>`;
 }
-
-function renderGantt() {
-  const svg = document.getElementById('gantt');
+function dateRange(minStr, maxStr) {
+  const out = []; const d = new Date(minStr + 'T00:00:00'); const end = new Date(maxStr + 'T00:00:00');
+  while (d <= end) { out.push(new Date(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+function inStay(day, b) { return day >= b.checkIn && day < b.checkOut; }
+function renderGridGantt() {
+  const el = document.getElementById('ganttGrid');
   const bookings = filteredBookings();
   const props = [...new Set(bookings.map(b=>b.property))];
-
-  const margin = { top: 50, right: 20, bottom: 20, left: 220 };
-  const rowH = 34;
-  const minDate = new Date(data.minDate + 'T00:00:00');
-  const maxDate = new Date(data.maxDate + 'T00:00:00');
-  const dayMs = 24*3600*1000;
-  const days = Math.max(1, Math.round((maxDate-minDate)/dayMs));
-
-  const pxPerDay = window.innerWidth < 700 ? 12 : 20;
-  const timelineWidth = Math.max(1200, days * pxPerDay);
-  const width = margin.left + margin.right + timelineWidth;
-  const height = Math.max(260, margin.top + margin.bottom + props.length*rowH + 30);
-  svg.setAttribute('width', width);
-  svg.setAttribute('height', height);
-
-  const x0 = margin.left;
-  const xW = timelineWidth;
-
-  function xFor(dateStr) {
-    const d = new Date(dateStr + 'T00:00:00');
-    const t = (d - minDate) / dayMs;
-    return x0 + (t/days)*xW;
+  const dates = dateRange(data.minDate, data.maxDate);
+  el.style.gridTemplateColumns = `180px repeat(${dates.length}, minmax(22px, 22px))`;
+  let html = '';
+  html += `<div class="gantt-month header-label">Property</div>`;
+  for (const d of dates) {
+    const isFirst = d.getDate() === 1;
+    const label = isFirst ? d.toLocaleString('en-US', {month:'short'}) : '';
+    html += `<div class="gantt-month">${label}</div>`;
   }
-
-  let g = '';
-  g += `<rect x="0" y="0" width="${width}" height="${height}" fill="#0f1d31"/>`;
-
-  let cur = new Date(minDate);
-  cur.setDate(1);
-  while (cur <= maxDate) {
-    const monthStart = new Date(cur);
-    const next = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
-    const x = xFor(monthStart.toISOString().slice(0,10));
-    const label = monthStart.toLocaleString('en-US', { month:'short', year:'numeric' });
-    g += `<line x1="${x}" y1="${margin.top-22}" x2="${x}" y2="${height-18}" stroke="#274262"/>`;
-    g += `<text x="${x+4}" y="${margin.top-28}" fill="#f7d36b" font-size="12">${label}</text>`;
-    cur = next;
+  html += `<div class="gantt-cell header-label">Property</div>`;
+  for (const d of dates) {
+    const wk = d.toLocaleString('en-US', {weekday:'short'}).slice(0,2);
+    html += `<div class="gantt-cell gantt-header" title="${d.toISOString().slice(0,10)}">${wk}<br>${d.getDate()}</div>`;
   }
-
-  props.forEach((p,i)=>{
-    const y = margin.top + i*rowH;
-    g += `<line x1="${margin.left}" y1="${y+18}" x2="${width-margin.right}" y2="${y+18}" stroke="#1f3450"/>`;
-    g += `<text x="18" y="${y+22}" fill="#e9f1ff" font-size="13">${p}</text>`;
-  });
-
-  for (const b of bookings) {
-    const i = props.indexOf(b.property);
-    if (i < 0) continue;
-    const y = margin.top + i*rowH + 6;
-    const x1 = xFor(b.checkIn);
-    const x2 = Math.max(x1+2, xFor(b.checkOut));
-    const w = x2-x1;
-    const title = `${b.property} | ${b.guest||'Guest'} | ${b.checkIn}→${b.checkOut} | ${b.nights} nights | ${b.platform}`;
-    g += `<rect x="${x1}" y="${y}" width="${w}" height="18" rx="4" fill="#33e0ff" opacity="0.86"><title>${title}</title></rect>`;
+  for (const p of props) {
+    html += `<div class="gantt-cell prop-label">${p}</div>`;
+    const pb = bookings.filter(b => b.property===p);
+    for (const d of dates) {
+      const ds = d.toISOString().slice(0,10);
+      const hit = pb.find(b => inStay(ds, b));
+      if (hit) {
+        const title = `${hit.guest||'Guest'} | ${hit.checkIn}→${hit.checkOut} | ${hit.nights} nights | ${hit.platform}`;
+        html += `<div class="gantt-cell occ" title="${title}"></div>`;
+      } else {
+        html += `<div class="gantt-cell"></div>`;
+      }
+    }
   }
-
-  svg.innerHTML = g;
+  el.innerHTML = html;
 }
-
-function renderAll() { renderTables(); renderGantt(); }
+function renderMobileWeek() {
+  const tbody = document.querySelector('#mobileWeekTable tbody'); if (!tbody) return;
+  const today = new Date(); const end = new Date(today); end.setDate(end.getDate()+6);
+  const rows = data.cleaning.filter(c => {
+    const d = new Date(c.date + 'T00:00:00');
+    const t0 = new Date(today.toISOString().slice(0,10)+'T00:00:00');
+    return d >= t0 && d <= end;
+  }).filter(c =>
+    (propertyFilter.value==='ALL' || c.property===propertyFilter.value) &&
+    (cleanerFilter.value==='ALL' || c.cleaner===cleanerFilter.value)
+  ).sort((a,b)=>a.date.localeCompare(b.date));
+  tbody.innerHTML = '';
+  for (const r of rows) tbody.innerHTML += `<tr><td>${r.date}</td><td>${r.property}</td><td>${r.cleaner}</td><td>${r.guest||''}</td><td>${(r.costISK||0).toLocaleString()} ISK</td></tr>`;
+}
+function renderAll() { renderTables(); renderGridGantt(); renderMobileWeek(); }
 [propertyFilter, cleanerFilter, monthFilter].forEach(el => el.addEventListener('change', renderAll));
 renderAll();
 </script>
