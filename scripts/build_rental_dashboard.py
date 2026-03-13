@@ -269,6 +269,12 @@ function dateRange(minStr, maxStr) {
   while (d <= end) { out.push(new Date(d)); d.setDate(d.getDate()+1); }
   return out;
 }
+function fmtLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function inStay(day, b) { return day >= b.checkIn && day < b.checkOut; }
 function renderGridGantt() {
   const el = document.getElementById('ganttGrid');
@@ -294,18 +300,20 @@ function renderGridGantt() {
   html += `<div class="gantt-cell header-label">Property</div>`;
   for (const d of dates) {
     const wk = d.toLocaleString('en-US', {weekday:'short'}).slice(0,2);
-    html += `<div class="gantt-cell gantt-header" title="${d.toISOString().slice(0,10)}">${wk}<br>${d.getDate()}</div>`;
+    const ds = fmtLocalISO(d);
+    html += `<div class="gantt-cell gantt-header" title="${ds}">${wk}<br>${d.getDate()}</div>`;
   }
 
   for (const p of props) {
     html += `<div class="gantt-cell prop-label">${p}</div>`;
     const pb = bookings.filter(b => b.property===p);
     for (const d of dates) {
-      const ds = d.toISOString().slice(0,10);
+      const ds = fmtLocalISO(d);
       const hit = pb.find(b => inStay(ds, b));
       if (hit) {
-        const title = `${hit.guest||'Guest'} | ${hit.checkIn}→${hit.checkOut} | ${hit.nights} nights | ${hit.platform}`;
-        html += `<div class="gantt-cell occ" title="${title}"></div>`;
+        const shortGuest = (hit.guest || 'Guest').replace(/^Reserved\\s*-\\s*/i,'').slice(0,3).toUpperCase();
+        const title = `${hit.guest||'Guest'} | ${hit.checkIn}→${hit.checkOut} | ${hit.nights} nights | ${hit.platform} | Cleaner: ${hit.cleaner||''}`;
+        html += `<div class="gantt-cell occ" title="${title}">${shortGuest}</div>`;
       } else {
         html += `<div class="gantt-cell"></div>`;
       }
