@@ -167,7 +167,7 @@ html_template = """<!doctype html>
       .filters { flex-direction:column; align-items:stretch; }
       .filters label { display:flex; flex-direction:column; gap:6px; }
       th, td { font-size:12px; padding:6px; }
-      .desktop-gantt { display:none; }
+      .gantt-grid { min-width: 1000px; }
       .mobile-week { display:block; }
     }
   </style>
