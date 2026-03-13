@@ -126,9 +126,24 @@ def dedupe(events):
     return out
 
 
+def _is_blocked_or_empty(summary: str) -> bool:
+    s = (summary or "").strip().lower()
+    blocked_markers = [
+        "not available",
+        "airbnb (not available)",
+        "blocked",
+        "block",
+        "unavailable",
+    ]
+    return any(m in s for m in blocked_markers)
+
+
 def make_cleaning_rows(events):
     rows = []
     for e in events:
+        # Do not create cleaner turnovers for blocked/empty holds
+        if _is_blocked_or_empty(e.get("summary", "")):
+            continue
         rows.append({
             "date": e["check_out"],
             "property": e["property"],
