@@ -1,13 +1,13 @@
-Cleaner Schedule (2026-03-13 to 2026-03-19)
+Cleaner Schedule (2026-05-11 to 2026-05-17)
 
 Darjia:
-- 2026-03-18 | HFJ Nidurri | checkout 2026-03-18 | Reserved | 15000 ISK
-- 2026-03-18 | HFJ Uppi | checkout 2026-03-18 | Reserved - Nathaniel | 15000 ISK
+- 2026-05-14 | HFJ Nidurri | checkout 2026-05-14 | Reserved | 15000 ISK
+- 2026-05-17 | HFJ Uppi | checkout 2026-05-17 | Reserved | 15000 ISK
 Weekly total for Darjia: 30000 ISK (2 changeovers)
 
 Jelena:
-- 2026-03-15 | RVK | checkout 2026-03-15 | Reserved - Daidze | 15000 ISK
-- 2026-03-19 | RVK | checkout 2026-03-19 | Reserved | 15000 ISK
+- 2026-05-13 | RVK | checkout 2026-05-13 | Reserved | 15000 ISK
+- 2026-05-17 | RVK | checkout 2026-05-17 | Reserved - benoit | 15000 ISK
 Weekly total for Jelena: 30000 ISK (2 changeovers)
 
 All cleaners weekly total: 60000 ISK (4 changeovers)
